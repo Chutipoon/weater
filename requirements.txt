@@ -1,0 +1,7 @@
+# weater pipeline dependencies
+pandas>=2.0
+numpy
+statsmodels>=0.14
+linearmodels>=6.0
+matplotlib>=3.7
+# World Bank + NOAA + SILSO are fetched with the stdlib (urllib) -- no API client needed.

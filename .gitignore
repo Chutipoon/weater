@@ -1,0 +1,12 @@
+# cached downloads + generated panel
+data/
+# figures + regression report
+outputs/
+__pycache__/
+*.pyc
+# background fetch job logs/pids (ephemeral, regenerated per run)
+precip_gee_fetch*.log
+precip_gee_fetch*.pid
+precip_gee_final_build.log
+# Claude Code session-local state
+.claude/
