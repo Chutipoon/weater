@@ -208,12 +208,24 @@ def iv_precip(df: pd.DataFrame) -> None:
     say("   growing-season precipitation = ENSO's LOCAL channel; strong first stage")
     say("=" * 72)
     # Relevance of the planetary signal: does ENSO move local growing-season precip?
-    rel = df.dropna(subset=["precip_anom_s", "enso_amplitude", "weak_gov"]).set_index(["iso3", "year"])
+    # precip_anom_s is SIGNED (detrend_signed, no .abs()), so it's tested against
+    # both the unsigned |ONI| amplitude (the reduced-form regressor elsewhere in
+    # this file) and a signed ONI series -- unsigned ENSO averages away the fact
+    # that El Nino and La Nina push regional rainfall in opposite directions,
+    # which is a plausible reason it doesn't detectably predict local precip.
+    rel = df.dropna(subset=["precip_anom_s", "enso_amplitude", "enso_signed_mean"]).set_index(["iso3", "year"])
     fs0 = PanelOLS.from_formula(
-        "precip_anom_s ~ 1 + enso_amplitude + enso_amplitude:weak_gov + EntityEffects",
+        "precip_anom_s ~ 1 + enso_amplitude + EntityEffects",
         rel, drop_absorbed=True).fit(cov_type="clustered", cluster_entity=True)
-    say(f"  ENSO -> local precip: enso coef={fs0.params.get('enso_amplitude', float('nan')):+.3f} "
+    say(f"  ENSO (unsigned |ONI| amplitude) -> local precip: coef="
+        f"{fs0.params.get('enso_amplitude', float('nan')):+.3f} "
         f"(p={fs0.pvalues.get('enso_amplitude', float('nan')):.3f})")
+    fs0b = PanelOLS.from_formula(
+        "precip_anom_s ~ 1 + enso_signed_mean + EntityEffects",
+        rel, drop_absorbed=True).fit(cov_type="clustered", cluster_entity=True)
+    say(f"  ENSO (signed ONI, El Nino +/La Nina -) -> local precip: coef="
+        f"{fs0b.params.get('enso_signed_mean', float('nan')):+.3f} "
+        f"(p={fs0b.pvalues.get('enso_signed_mean', float('nan')):.3f})")
     # 2SLS: precip instruments yield -> health
     d = df.dropna(subset=["life_expectancy", "cereal_yield", "precip_anom_s", "log_gdp"]).copy()
     res = IV2SLS.from_formula(

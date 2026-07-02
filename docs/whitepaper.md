@@ -157,26 +157,47 @@ the mostly-cross-country variance in cereal yield.
 
 The natural fix is country-level, ENSO-driven growing-season precipitation
 (CHIRPS via Google Earth Engine, 198 countries × 27 years, 1996–2022), which
-should give the instrument cross-sectional power. **It doesn't.** Two links in
-that chain were tested and both are weak:
+should give the instrument cross-sectional power. **It doesn't — but not for
+the reason first suspected.** Two links in that chain were tested:
 
-> ENSO → local growing-season precipitation: coef = +0.031 (**p = 0.46**, not
-> significant) — planetary ENSO amplitude does not detectably move country-level
-> precipitation in this specification.
+> ENSO (unsigned |ONI| amplitude) → local growing-season precipitation:
+> coef = +0.031, **p = 0.46** — not significant.
 >
 > Local precipitation → cereal yield (the actual IV first stage): **F = 1.16**
 > — *weaker* than the global-ENSO instrument it was meant to replace.
 
-The resulting 2SLS coefficient (+0.00018, p = 0.916) is directionally sane
-(more yield associates with more life expectancy) but, with F this low, is not
-statistically informative — weak instruments bias 2SLS toward the endogenous
-OLS estimate and inflate variance, so neither the sign nor the magnitude should
-be read as evidence for or against the causal channel. **We report this as a
-negative result**: with the open data used here, we could not construct an
-instrument for agricultural output strong enough to support credible 2SLS
-identification of the crop → health link. Two concrete, untested candidate
-fixes are noted in Limitations below; neither was pursued, since the paper's
-central claim (H2/H3 reduced form, above) does not depend on this instrument.
+One candidate cause from Limitations has since been tested and **confirmed**:
+unsigned ENSO amplitude averages together El Niño and La Niña, which push
+regional rainfall in opposite directions, erasing the very signal the
+relevance test is looking for. Re-running the same test with a **signed**
+ONI series (`enso_signed_mean`, `src/fetch_astro_temporal.py`) instead of the
+unsigned amplitude gives a completely different answer:
+
+> ENSO (signed ONI, El Niño +/La Niña −) → local growing-season precipitation:
+> coef = **−0.171, p < 0.001** — highly significant. El Niño years bring
+> measurably *less* growing-season precipitation on average, consistent with
+> El Niño's well-documented drying effect across much of the tropics.
+
+So the ENSO → precipitation link is not actually broken; the unsigned proxy
+was hiding it. **This does not, however, rescue the overall instrument**,
+because it isn't the binding constraint: the actual IV first stage is
+precipitation → cereal yield (F = 1.16), which this fix leaves untouched — it
+only strengthens the *diagnostic* that ENSO is a valid upstream driver of
+precipitation, not the *yield-relevance* of precipitation itself. The
+remaining bottleneck is the growing-season precipitation measure not
+capturing yield-relevant rainfall (see the unwrapped Dec/Jan window, still
+unfixed, below). The resulting 2SLS coefficient (+0.00018, p = 0.916) is
+directionally sane (more yield associates with more life expectancy) but,
+with the precip→yield F this low, is not statistically informative — weak
+instruments bias 2SLS toward the endogenous OLS estimate and inflate
+variance, so neither the sign nor the magnitude should be read as evidence
+for or against the causal channel. **We report this as a negative result**:
+with the open data used here, we could not construct an instrument for
+agricultural output strong enough to support credible 2SLS identification of
+the crop → health link, even after confirming and fixing one of the two
+suspected causes. One concrete, untested candidate fix (the Dec/Jan-wrapping
+wet-season window) remains, noted in Limitations below; the paper's central
+claim (H2/H3 reduced form, above) does not depend on this instrument.
 
 **Caveat on the instrument.** ENSO may reach health partly through floods and
 disease (cholera, malaria, disasters), not crops alone — so the exclusion
@@ -316,16 +337,26 @@ result.
 - Governance (WGI) is sticky → weak within-country identification.
 - Several astronomical signals (ENSO, sunspots, LOD) are global-annual.
 - IV exclusion restrictions are hard to satisfy with weather instruments.
-- **ENSO amplitude is unsigned (mean/peak |ONI|), not signed.** Appropriate for
-  the reduced-form "do bigger shocks hurt more" question, but a poor relevance
-  regressor for a signed local-precipitation instrument — El Niño and La Niña
-  push regional rainfall in opposite directions, and averaging away that sign
-  before it ever reaches the precip-IV test plausibly explains why ENSO
-  doesn't detectably predict local precipitation in that specification. Not
-  yet tested with a signed ONI series.
-- **The growing-season precipitation window doesn't wrap the calendar year.**
-  "Wettest 3 consecutive months" is computed only over non-wrapping windows
-  within Jan–Dec, so a true wet season straddling the Dec/Jan boundary (common
-  in Southern Hemisphere growing seasons) is understated in exactly the years
-  its peak crosses that boundary — a plausible, untested contributor to the
-  weak precip → yield first stage above.
+- **~~ENSO amplitude is unsigned~~ — tested and confirmed; a signed series
+  fixes the ENSO→precipitation link but not the overall instrument.** The
+  unsigned `enso_amplitude`/`enso_max_abs` columns (mean/peak |ONI|) remain
+  appropriate for the reduced-form "do bigger shocks hurt more" question, but
+  were a poor relevance regressor for a *signed* local-precipitation
+  instrument, since El Niño and La Niña push regional rainfall in opposite
+  directions and averaging away that sign hid the relationship (p = 0.46).
+  Added `enso_signed_mean` (`src/fetch_astro_temporal.py`) and re-ran the
+  relevance test: **coef = −0.171, p < 0.001** — El Niño years bring
+  significantly less growing-season precipitation. The hypothesis was
+  correct, and the ENSO→precipitation link is real. It does not, however,
+  rescue the IV chain: the binding constraint is the *next* link,
+  precipitation → cereal yield (F = 1.16), which this fix does not touch —
+  see the unwrapped wet-season window below, still the live candidate cause
+  of that specific weakness.
+- **The growing-season precipitation window doesn't wrap the calendar year
+  (still unfixed).** "Wettest 3 consecutive months" is computed only over
+  non-wrapping windows within Jan–Dec, so a true wet season straddling the
+  Dec/Jan boundary (common in Southern Hemisphere growing seasons) is
+  understated in exactly the years its peak crosses that boundary — a
+  plausible, still-untested contributor to the weak precip → yield first
+  stage (F = 1.16) that is now, after the signed-ONI fix above, the sole
+  remaining suspect for why the precipitation instrument doesn't work.

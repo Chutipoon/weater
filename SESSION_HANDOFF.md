@@ -16,8 +16,8 @@ writing. This file is intentionally short; don't duplicate that history here._
 - **Data pipeline complete and clean:**
   - `data/precip_country_gee.csv` — 198 countries, 5346 rows, full 27-year
     coverage (1996-2022), no known gaps.
-  - `data/panel.csv` — built via `src/build_panel.py`, 5859 rows × 24 cols,
-    217 countries.
+  - `data/panel.csv` — built via `src/build_panel.py`, 5859 rows × 25 cols
+    (25th = new `enso_signed_mean`), 217 countries.
   - `outputs/iv_report.txt` — analysis complete via `src/analyze_iv.py`.
 - **Key result — revised, weaker than first reported.** The paper's headline
   reduced-form claim (ENSO×weak-governance → life expectancy, interaction
@@ -30,8 +30,14 @@ writing. This file is intentionally short; don't duplicate that history here._
   and Limitations — the paper no longer claims this result is settled. The
   precip-IV effort remains a separate **negative result**: first-stage F=1.16,
   weaker than the naive global-ENSO instrument (F=1.49) it was meant to
-  replace, with two identified-but-unimplemented candidate causes (see Open
-  items below).
+  replace. Of the two candidate causes, the **signed-ONI fix is now
+  implemented and confirmed**: unsigned ENSO amplitude didn't predict local
+  precipitation (p=0.46), but a signed series does, strongly (coef=-0.171,
+  p<0.001) — El Niño years bring measurably less growing-season rain. That
+  doesn't rescue the instrument, though: the binding constraint is the next
+  link, precip→cereal-yield (F=1.16, untouched by this fix). The remaining
+  candidate cause (Dec/Jan-wrapping wet-season window) is unimplemented (see
+  Open items below).
 - **Version control:** repo pushed to GitHub (`github.com/Chutipoon/weater`,
   `main`). `data/`, `outputs/`, session-local logs, and `.claude/` are
   gitignored — `outputs/iv_report.txt` regenerates via `python
@@ -47,23 +53,13 @@ writing. This file is intentionally short; don't duplicate that history here._
    (pre-1996 or post-2022) so trend and ENSO-cycle timing are less
    collinear. No implementation started.
 
-2. **Two candidate fixes for the weak precip-IV first stage** (abstract-level
-   TODO — see `docs/whitepaper.md` Limitations for the full rationale on
-   each). Genuinely open-ended, uncertain payoff, not a quick fix; worth
-   doing only if someone wants another run at causal identification:
+2. **Remaining candidate fix for the weak precip-IV first stage.** ~~Signed
+   ONI series~~ — **done** (`enso_signed_mean` in `src/fetch_astro_temporal.py`
+   `fetch_enso()`; used in `src/analyze_iv.py` `iv_precip()`'s relevance
+   test). Confirmed the hypothesis (ENSO does move local precip once signed)
+   but did not fix the overall instrument, since the bottleneck is the next
+   link down. Still open:
 
-   - **Signed ONI series.** `enso_amplitude` (`src/fetch_astro_temporal.py`
-     `fetch_enso()`, ~line 34) is unsigned (`abs().mean()` / `abs().max()`),
-     which averages away the fact that El Niño and La Niña push regional
-     rainfall in *opposite* directions — a plausible reason ENSO doesn't
-     detectably predict local precipitation. TODO: add a signed variant
-     (e.g. `enso_signed_mean`, no `.abs()`) alongside the existing unsigned
-     columns (keep those — they're still right for the reduced-form "do
-     bigger shocks hurt more" question); thread it through
-     `src/build_panel.py`; use it (not `enso_amplitude`) as the relevance
-     regressor in `iv_precip()`'s first line
-     (`src/analyze_iv.py`, ~line 168-171); re-run `analyze_iv.py` and check
-     whether the ENSO→precip relevance p-value improves.
    - **Wrap the wet-season window across Dec/Jan.** `precip_wet3`
      (`src/fetch_precip_gee.py`, ~line 317-318) picks the wettest 3
      consecutive months only within `range(10)` (windows starting Jan
@@ -75,11 +71,10 @@ writing. This file is intentionally short; don't duplicate that history here._
      `data/precip_country_gee.csv`, so **requires re-running the GEE fetch**
      (`fetch_precip_gee.py`) or at minimum recomputing `precip_wet3` from the
      already-fetched raw monthly checkpoint data (`precip_country_gee_raw*.jsonl`)
-     without a full re-fetch, then `build_panel.py` + `analyze_iv.py`.
-
-   These two are independent and can be done in either order or separately;
-   doing only the signed-ONI fix is the cheaper first experiment since it
-   doesn't require touching GEE data.
+     without a full re-fetch, then `build_panel.py` + `analyze_iv.py`. This is
+     now the sole remaining suspect for the weak precip→yield first stage
+     (F=1.16), genuinely open-ended, uncertain payoff — worth doing only if
+     someone wants another run at causal identification.
 
 ## Where to look for more
 

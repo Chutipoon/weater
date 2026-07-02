@@ -34,8 +34,19 @@ def _get_text(url: str) -> str:
 def fetch_enso() -> pd.DataFrame:
     """Annual ENSO irregularity from the monthly ONI ascii table.
 
-    Columns: enso_amplitude (mean |anomaly| in the year, how far from neutral)
-             enso_max_abs   (peak |anomaly|, strength of the year's extreme).
+    Columns: enso_amplitude   (mean |anomaly| in the year, how far from
+                               neutral -- unsigned, right for "do bigger
+                               shocks hurt more" questions).
+             enso_max_abs     (peak |anomaly|, strength of the year's
+                               extreme -- unsigned).
+             enso_signed_mean (mean SIGNED anomaly in the year -- El Nino
+                               positive, La Nina negative. Unlike the two
+                               columns above, this preserves direction, which
+                               matters for anything downstream that itself has
+                               a sign, e.g. local precipitation: El Nino and
+                               La Nina push regional rainfall in opposite
+                               directions, so the unsigned columns average
+                               that signal away.)
     """
     txt = _get_text(config.ENSO_ONI_URL)
     rows = []
@@ -48,6 +59,7 @@ def fetch_enso() -> pd.DataFrame:
     out = pd.DataFrame({
         "enso_amplitude": g.apply(lambda s: s.abs().mean()),
         "enso_max_abs": g.apply(lambda s: s.abs().max()),
+        "enso_signed_mean": g.apply(lambda s: s.mean()),
     }).reset_index()
     return out
 
