@@ -286,7 +286,7 @@ constraint.** Every regression here controls for GDP per capita precisely
 because governance and income are collinear enough that an uncontrolled
 version of H2 would just be restating "poor countries are more fragile." That
 control is necessary but, as the fragility above shows, not sufficient:
-governance is sticky within a country (`research_design.md` §5), so most of
+governance is sticky within a country (`research_design.md` §6), so most of
 its identifying variation is cross-country, and cross-country comparisons are
 exactly where omitted development-adjacent confounders (institutional history,
 colonial legacy, geography, and — concretely, now demonstrated — divergent

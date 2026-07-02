@@ -9,7 +9,8 @@ Hypothesis** ("rotate irregularly" = variance/anomaly metrics, not orbital
 mechanics). Full context, mapping tables, and caveats already written — do not
 re-derive:
 - `idea.txt` (the sutta), `goal.txt` (the three summit goals)
-- `docs/research_design.md` (concept→data map, 5 astro nodes, caveats, roadmap §7)
+- `docs/research_design.md` (concept→data map, 5 astro nodes, §5 Discussion,
+  caveats, roadmap §8 — renumbered since this file was last updated)
 - `docs/whitepaper.md` (summit #3 draft — Intro/Data-Map/Methods stable; Results updated)
 - Plan: `C:\Users\acer\.claude\plans\look-in-idea-txt-can-it-mossy-cherny.md`
 - Memory: `weater-project-state.md`, `leverage-full-skillset.md` (proactively use skills)

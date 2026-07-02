@@ -95,7 +95,64 @@ extensions.
 - **Between-country model:** because governance is sticky, also test its
   *cross-country* variation on country-mean outcomes (`statsmodels` OLS).
 
-## 5. Caveats (read before interpreting)
+## 5. Discussion — what the finished analysis actually established
+
+This section supersedes §6 below (an early run) and matches
+`docs/whitepaper.md` §5; read that for full prose, this is the same content in
+this doc's terser style.
+
+- **What survives.** Substitution is valid (proxies recover known reality —
+  ENSO reproduces both super-El-Niños, `rule_of_law` correlates as expected
+  with health). The final H2/H3 reduced form — `enso_amplitude × weak_gov` on
+  `life_expectancy`, country FE + GDP control — gives interaction **−0.44,
+  p = 0.033** (weak-gov countries lose ~twice the life expectancy per unit
+  ENSO shock: −0.86 vs −0.42 yr). This is not an artifact of omitting year
+  effects: it holds, and tightens, under two-way FE (p = 0.015).
+- **Why it's fragile, not settled.** The same interaction loses significance
+  and flips sign once weak-gov and strong-gov countries are allowed separate
+  secular health trends (p = 0.101; both controls together p = 0.390), and
+  weakens hard when the two largest ENSO events (1997/98, 2015/16) are
+  dropped (p = 0.197). Both are standard, non-exotic checks. The honest
+  read: this dataset cannot yet distinguish "weak governance amplifies
+  climate shocks" from "the two governance groups were on different health
+  trajectories over this 27-year window that happen to correlate with when
+  the big ENSO events fell." See `src/analyze_iv.py` `robustness_health()`.
+- **GDP confound: necessary, not sufficient.** Controlling for GDP rules out
+  the trivial "poor countries are more fragile" read, but governance is
+  sticky within a country (§6, "Fixed-effects washout"), so most identifying variation
+  is cross-country — exactly where omitted development-adjacent confounders
+  (institutional history, colonial legacy, geography, and now demonstrably
+  divergent health trends) are hardest to rule out with FE + one control.
+- **Crop-yield leg still unconfirmed.** `enso_amplitude × weak_gov` on yield
+  anomaly (not health) is same-signed but not significant (p = 0.367) — the
+  mechanism the reduced form implies (shocks → crops → health, amplified by
+  weak governance at both legs) is asserted by the whole-chain result but not
+  independently confirmed at the crop-yield step.
+- **H3 causal IV: negative, and now firmly so.** Both candidate fixes for the
+  weak precip-IV first stage identified in an earlier pass have since been
+  implemented and tested, and neither rescues it:
+  - *Signed ONI* (`enso_signed_mean`): confirms ENSO does move local
+    precipitation once sign is preserved (coef −0.17, **p < 0.001**, vs
+    p = 0.46 unsigned) — El Niño years measurably drier. Doesn't touch the
+    real bottleneck.
+  - *Dec/Jan-wrapping wet-season window*: mechanically real (Southern
+    Hemisphere countries shift 10-30% on average, confirming the wrap was
+    genuinely missing wet-season rain), but the precip → cereal-yield first
+    stage went from F = 1.16 to **F = 0.87** — slightly weaker, not
+    stronger.
+  - First-stage F sequence: global ENSO 1.49 → local precip 1.16 → local
+    precip (wrap-fixed) 0.87. The problem is structural: precipitation,
+    however measured, does not predict national cereal yield in this data.
+    Sub-national resolution or a different instrument entirely would be
+    needed, not a further tweak to ENSO or precipitation construction.
+- **Bottom line, replacing §9's older conclusion below:** the cascade is a
+  real, plausible, governance-conditioned pattern in the open-data record —
+  not proof of the sutta's literal causal chain (never testable, per the
+  reframing in §1), and, on the strictest checks performed, not yet proof of
+  its functional core either. That gap is the result; see `whitepaper.md` §5
+  for the full argument.
+
+## 6. Caveats (read before interpreting)
 
 - **No celestial causation.** The astronomical nodes are reframed as *observable
   regularity*; LOD/sunspots are real but not behaviour-driven.
@@ -108,7 +165,12 @@ extensions.
 - **Ecological correlation, reverse causality.** Lagging predictors mitigates but
   does not identify causal effects.
 
-## 6. What the data actually shows (this run)
+## 7. What the data actually shows — early run (superseded by §5)
+
+_Kept for history; this was a continuous-`rule_of_law` interaction on an
+earlier cut of the panel, before the `weak_gov` bottom-quartile dummy, the
+health outcome, and the robustness checks in §5 existed. Read §5, not this,
+for the current result._
 
 - **Substitution is valid:** proxies recover known reality — ENSO amplitude
   reproduces the 1997/98 and 2015/16 super-El-Niños; `rule_of_law` correlates
@@ -119,7 +181,7 @@ extensions.
   but **not significant** (p≈0.28); between-country, `rule_of_law` is
   insignificant once GDP is held (R²≈0.70 from GDP alone).
 
-## 7. Roadmap (from `goal.txt`) — three summits
+## 8. Roadmap (from `goal.txt`) — three summits
 
 1. **Climate Risk Model, not cosmic mechanism.** Reframe as: natural-system
    volatility (nodes A–D, esp. country-level **DTR** node C and **MJO** node D)
@@ -139,11 +201,16 @@ is global → no map, weak instrument). Source chosen: capital-point **DTR** fro
 **Open-Meteo ERA5 archive** (free, keyless), coordinates from World Bank country
 metadata. Caveat: capital-point ≠ agricultural-region average — a stated v1 proxy.
 
-## 8. Conclusion (v1, ENSO-only)
+## 9. Conclusion
 
-The Adhammika cascade can be substituted with free data and is
-visible as a real *pattern of co-movement* — but it is largely explained by
-development level, is not demonstrably a literal causal chain, and certainly not
+The Adhammika cascade can be substituted with free data and is visible as a
+real, governance-conditioned pattern — but it is fragile under standard
+robustness checks (§5), the crop-yield mechanism it implies is not
+independently confirmed, and the causal (IV) version of the claim is a
+negative result even after both known fixes to the instrument were tried and
+ruled out. It is not demonstrably a literal causal chain, and certainly not
 celestial mechanics. The framework is a sound scaffold for examining the
-behavioural relationships; stronger identification (instrumental variables, more
-of nodes A–D, sub-national resolution) would be the next step.
+behavioural relationships; stronger identification would now require
+structural changes (sub-national resolution, a differently-mechanised
+instrument) rather than further tuning of what's already been tried — see §5
+and `whitepaper.md` §5 for the full accounting.
