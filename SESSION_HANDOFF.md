@@ -19,35 +19,73 @@ writing. This file is intentionally short; don't duplicate that history here._
   - `data/panel.csv` — built via `src/build_panel.py`, 5859 rows × 24 cols,
     217 countries.
   - `outputs/iv_report.txt` — analysis complete via `src/analyze_iv.py`.
-- **Key result:** the paper's core reduced-form claim holds (ENSO×weak-
-  governance → life expectancy, interaction −0.44, p=0.033) and does not
-  depend on any instrument. The precip-IV effort — the point of the whole
-  multi-day GEE fetch — is a **negative result**: first-stage F=1.16, weaker
-  than the naive global-ENSO instrument (F=1.49) it was meant to replace.
-  This is now written up honestly in `docs/whitepaper.md` §4 and Limitations,
-  including two identified-but-untested candidate causes (ENSO amplitude is
-  unsigned/|ONI|, and the growing-season wet-window calc doesn't wrap the
-  Dec/Jan boundary).
-- **Version control:** repo initialized this session (`git init`) and
-  committed (`74634c1`, 21 files, working tree clean). `data/`, `outputs/`,
-  session-local logs, and `.claude/` are gitignored.
+- **Key result — revised, weaker than first reported.** The paper's headline
+  reduced-form claim (ENSO×weak-governance → life expectancy, interaction
+  −0.44, p=0.033) is now known to be **fragile**: a `/scrutinize` pass plus
+  new robustness checks in `src/analyze_iv.py` (`robustness_health()`) show it
+  survives year fixed effects (p=0.015) but **loses significance and flips
+  sign** under a weak-gov-specific linear trend (p=0.101), and weakens hard
+  when the two super-El-Niño years (1997/98, 2015/16) are dropped (p=0.197).
+  This is now written up honestly in `docs/whitepaper.md` abstract, §4, §5,
+  and Limitations — the paper no longer claims this result is settled. The
+  precip-IV effort remains a separate **negative result**: first-stage F=1.16,
+  weaker than the naive global-ENSO instrument (F=1.49) it was meant to
+  replace, with two identified-but-unimplemented candidate causes (see Open
+  items below).
+- **Version control:** repo pushed to GitHub (`github.com/Chutipoon/weater`,
+  `main`). `data/`, `outputs/`, session-local logs, and `.claude/` are
+  gitignored — `outputs/iv_report.txt` regenerates via `python
+  src/analyze_iv.py` (needs `data/panel.csv`, not tracked in git).
 
 ## Open items (optional, not blocking, nothing time-sensitive)
 
-1. `docs/whitepaper.md` §5 Discussion is still marked `(to write)`.
-2. The abstract still says "Headline findings pending" — could be finalized
-   now that §4 is stable.
-3. The two candidate fixes for the weak precip instrument (signed ONI series;
-   wrapping the wet-season window search across Dec/Jan) are documented in
-   the Limitations section but unimplemented. Worth doing only if someone
-   wants to take another run at causal identification — genuinely open-ended
-   effort with uncertain payoff, not a quick fix.
+1. **Resolve the health-interaction fragility** (see Key result above).
+   Options: (a) find/control for what's actually driving the
+   weak-gov-specific trend so the interaction can be tested cleanly against
+   it, (b) accept the null and rewrite the paper's claim as "suggestive,
+   unresolved" rather than pursuing further, or (c) get more years of data
+   (pre-1996 or post-2022) so trend and ENSO-cycle timing are less
+   collinear. No implementation started.
+
+2. **Two candidate fixes for the weak precip-IV first stage** (abstract-level
+   TODO — see `docs/whitepaper.md` Limitations for the full rationale on
+   each). Genuinely open-ended, uncertain payoff, not a quick fix; worth
+   doing only if someone wants another run at causal identification:
+
+   - **Signed ONI series.** `enso_amplitude` (`src/fetch_astro_temporal.py`
+     `fetch_enso()`, ~line 34) is unsigned (`abs().mean()` / `abs().max()`),
+     which averages away the fact that El Niño and La Niña push regional
+     rainfall in *opposite* directions — a plausible reason ENSO doesn't
+     detectably predict local precipitation. TODO: add a signed variant
+     (e.g. `enso_signed_mean`, no `.abs()`) alongside the existing unsigned
+     columns (keep those — they're still right for the reduced-form "do
+     bigger shocks hurt more" question); thread it through
+     `src/build_panel.py`; use it (not `enso_amplitude`) as the relevance
+     regressor in `iv_precip()`'s first line
+     (`src/analyze_iv.py`, ~line 168-171); re-run `analyze_iv.py` and check
+     whether the ENSO→precip relevance p-value improves.
+   - **Wrap the wet-season window across Dec/Jan.** `precip_wet3`
+     (`src/fetch_precip_gee.py`, ~line 317-318) picks the wettest 3
+     consecutive months only within `range(10)` (windows starting Jan
+     through Oct — never wraps past December), understating Southern
+     Hemisphere wet seasons that straddle the calendar boundary. TODO:
+     extend the window search to include Nov-Dec-(next Jan) and
+     Dec-(next Jan)-(next Feb) by pulling in the following year's `m01`/`m02`
+     columns before taking the max; this changes the GEE-derived
+     `data/precip_country_gee.csv`, so **requires re-running the GEE fetch**
+     (`fetch_precip_gee.py`) or at minimum recomputing `precip_wet3` from the
+     already-fetched raw monthly checkpoint data (`precip_country_gee_raw*.jsonl`)
+     without a full re-fetch, then `build_panel.py` + `analyze_iv.py`.
+
+   These two are independent and can be done in either order or separately;
+   doing only the signed-ONI fix is the cheaper first experiment since it
+   doesn't require touching GEE data.
 
 ## Where to look for more
 
 - `HANDOFF.md` — full technical history of the GEE fetch debugging.
-- `docs/whitepaper.md` — the actual paper draft; §1-3 stable, §4 just updated
-  this session, §5 not started.
+- `docs/whitepaper.md` — the actual paper draft; abstract and §1-5 all
+  stable as of this session, including the fragility writeup.
 - `docs/research_design.md` — original design doc, if it exists and is
   still relevant context.
 
@@ -58,7 +96,6 @@ writing. This file is intentionally short; don't duplicate that history here._
   duplicate rows → column mislabeling → ISO3 gaps) is a strong candidate for
   a written post-mortem: many distinct, stacked root causes, each diagnosed
   and fixed narrowly. Not yet written.
-- **scrutinize** — already run once on the precip-IV result this session
-  (see `docs/whitepaper.md` §4 for the outcome); if §5 Discussion or the
-  abstract get written next, worth another pass before considering the paper
-  done.
+- **scrutinize** — already run twice (precip-IV result, then the health
+  interaction's robustness — see `docs/whitepaper.md` §4/§5 for both
+  outcomes). Worth another pass if either open item above gets implemented.
