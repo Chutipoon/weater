@@ -28,16 +28,27 @@ writing. This file is intentionally short; don't duplicate that history here._
   when the two super-El-Niño years (1997/98, 2015/16) are dropped (p=0.197).
   This is now written up honestly in `docs/whitepaper.md` abstract, §4, §5,
   and Limitations — the paper no longer claims this result is settled. The
-  precip-IV effort remains a separate **negative result**: first-stage F=1.16,
-  weaker than the naive global-ENSO instrument (F=1.49) it was meant to
-  replace. Of the two candidate causes, the **signed-ONI fix is now
-  implemented and confirmed**: unsigned ENSO amplitude didn't predict local
-  precipitation (p=0.46), but a signed series does, strongly (coef=-0.171,
-  p<0.001) — El Niño years bring measurably less growing-season rain. That
-  doesn't rescue the instrument, though: the binding constraint is the next
-  link, precip→cereal-yield (F=1.16, untouched by this fix). The remaining
-  candidate cause (Dec/Jan-wrapping wet-season window) is unimplemented (see
-  Open items below).
+  precip-IV effort remains a separate **negative result, now on firmer
+  ground**: first-stage F=1.49 (global ENSO) / F=0.87 (precipitation, after
+  both fixes below), both far below usable. **Both candidate causes from
+  Limitations are now implemented and tested; neither rescues it:**
+  - *Signed ONI* (`enso_signed_mean`, `fetch_astro_temporal.py`): confirmed —
+    unsigned ENSO didn't predict local precip (p=0.46), signed ONI does
+    strongly (coef=-0.171, p<0.001, El Niño years drier). Doesn't touch the
+    actual bottleneck (precip→cereal-yield), so no improvement there.
+  - *Dec/Jan-wrapping wet-season window* (`_finalize()`,
+    `fetch_precip_gee.py`, recomputed from the existing raw checkpoint, no
+    GEE re-fetch needed): mechanically confirmed real — lands squarely on
+    Southern Hemisphere countries (Namibia +28% avg precip_wet3, up to +144%
+    in single years; Zimbabwe +29% avg; Australia/South Africa both
+    double-digit avg) — but the precip→yield first stage went from F=1.16 to
+    **F=0.87**, if anything slightly weaker.
+
+  Conclusion: the weakness is in whether country-year growing-season
+  precipitation, however measured, predicts country-year cereal yield — not
+  in how ENSO or the precip proxy are constructed. No more untested candidate
+  causes remain; a different approach (sub-national data, a different
+  instrument) would be needed to revisit this link (see Open items below).
 - **Version control:** repo pushed to GitHub (`github.com/Chutipoon/weater`,
   `main`). `data/`, `outputs/`, session-local logs, and `.claude/` are
   gitignored — `outputs/iv_report.txt` regenerates via `python
@@ -53,28 +64,16 @@ writing. This file is intentionally short; don't duplicate that history here._
    (pre-1996 or post-2022) so trend and ENSO-cycle timing are less
    collinear. No implementation started.
 
-2. **Remaining candidate fix for the weak precip-IV first stage.** ~~Signed
-   ONI series~~ — **done** (`enso_signed_mean` in `src/fetch_astro_temporal.py`
-   `fetch_enso()`; used in `src/analyze_iv.py` `iv_precip()`'s relevance
-   test). Confirmed the hypothesis (ENSO does move local precip once signed)
-   but did not fix the overall instrument, since the bottleneck is the next
-   link down. Still open:
-
-   - **Wrap the wet-season window across Dec/Jan.** `precip_wet3`
-     (`src/fetch_precip_gee.py`, ~line 317-318) picks the wettest 3
-     consecutive months only within `range(10)` (windows starting Jan
-     through Oct — never wraps past December), understating Southern
-     Hemisphere wet seasons that straddle the calendar boundary. TODO:
-     extend the window search to include Nov-Dec-(next Jan) and
-     Dec-(next Jan)-(next Feb) by pulling in the following year's `m01`/`m02`
-     columns before taking the max; this changes the GEE-derived
-     `data/precip_country_gee.csv`, so **requires re-running the GEE fetch**
-     (`fetch_precip_gee.py`) or at minimum recomputing `precip_wet3` from the
-     already-fetched raw monthly checkpoint data (`precip_country_gee_raw*.jsonl`)
-     without a full re-fetch, then `build_panel.py` + `analyze_iv.py`. This is
-     now the sole remaining suspect for the weak precip→yield first stage
-     (F=1.16), genuinely open-ended, uncertain payoff — worth doing only if
-     someone wants another run at causal identification.
+2. **Precip-IV first stage: both known candidate fixes exhausted, still
+   weak.** ~~Signed ONI series~~ and ~~Dec/Jan wet-season wrap~~ are both
+   **done** (see Key result above) and neither improved F. This item is
+   closed as far as "known, cheap candidate causes" goes. If anyone wants to
+   take another run at causal identification for the crop→health link, it
+   would need a genuinely different approach, not a variant of these two:
+   sub-national crop/precipitation data (FAO GAUL admin-1) to escape
+   country-year ecological aggregation, or an instrument with a different
+   a priori mechanism than ENSO-mediated rainfall entirely. Open-ended,
+   uncertain payoff — not attempted.
 
 ## Where to look for more
 

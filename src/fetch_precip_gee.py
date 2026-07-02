@@ -215,6 +215,64 @@ def _reduce_multi_fragment(ee, img, all_countries, name, scale):
         return None
 
 
+def _finalize(records: list[dict]) -> pd.DataFrame:
+    """Build the final iso3/year/precip_annual/precip_wet3 frame from raw monthly
+    records. Shared by the live GEE fetch and by recompute() (which reruns this
+    from an already-fetched raw checkpoint, no GEE access needed)."""
+    df = pd.DataFrame(records)
+    mcols = [f"m{m:02d}" for m in range(1, 13)]
+    df["precip_annual"] = df[mcols].sum(axis=1)
+
+    # Wettest 3 consecutive months ("growing season"). Includes windows that
+    # wrap across the Dec/Jan boundary (common for Southern Hemisphere growing
+    # seasons, e.g. Nov-Dec-Jan) by pulling in the SAME country's FOLLOWING
+    # year's Jan/Feb -- without this, a wet season peaking across the boundary
+    # is understated in exactly the years its peak crosses it. Falls back to
+    # non-wrapping windows only where the following year isn't in the data
+    # (e.g. the final year, or a country missing one year).
+    nxt = df[["adm0_name", "year", "m01", "m02"]].copy()
+    nxt["year"] -= 1
+    nxt = nxt.rename(columns={"m01": "next_m01", "m02": "next_m02"})
+    wrapped = df.merge(nxt, on=["adm0_name", "year"], how="left")
+
+    def _wet3(row):
+        windows = [row[mcols].values[i:i + 3].sum() for i in range(10)]
+        if pd.notna(row["next_m01"]):
+            windows.append(row["m11"] + row["m12"] + row["next_m01"])
+            if pd.notna(row["next_m02"]):
+                windows.append(row["m12"] + row["next_m01"] + row["next_m02"])
+        return max(windows)
+
+    df["precip_wet3"] = wrapped.apply(_wet3, axis=1)
+
+    # map GAUL names -> ISO3
+    x = _name_to_iso3()
+    norm = lambda s: "".join(ch for ch in s.lower() if ch.isalnum())
+    df["iso3"] = df["adm0_name"].map(
+        lambda n: GAUL_ISO3_OVERRIDES.get(n) or x.get(norm(n)))
+    miss = sorted(df.loc[df["iso3"].isna(), "adm0_name"].unique())
+    if miss:
+        print(f"\n[!] {len(miss)} GAUL names had no ISO3 match (fix manually if "
+              f"needed): {miss[:20]}{'...' if len(miss) > 20 else ''}", flush=True)
+    return df.dropna(subset=["iso3"])[["iso3", "year", "precip_annual", "precip_wet3"]]
+
+
+def recompute(raw_checkpoint=None, cache=None) -> pd.DataFrame:
+    """Recompute precip_annual/precip_wet3 (incl. the Dec/Jan wrap fix) from an
+    already-fetched raw checkpoint. No GEE access needed -- only re-derives the
+    Python-side aggregation from monthly data already on disk."""
+    raw_checkpoint = raw_checkpoint or RAW_CHECKPOINT
+    cache = cache or CACHE
+    records, done_years = _load_checkpoint(raw_checkpoint)
+    if not records:
+        sys.exit(f"No records found in {raw_checkpoint}")
+    out = _finalize(records)
+    out.to_csv(cache, index=False)
+    print(f"\n[recompute] {out['iso3'].nunique()} countries / {len(out)} rows "
+          f"(years {min(done_years)}-{max(done_years)}) -> {cache}", flush=True)
+    return out
+
+
 def fetch(years=None, raw_checkpoint=None, cache=None) -> pd.DataFrame:
     years = years if years is not None else config.YEARS
     raw_checkpoint = raw_checkpoint or RAW_CHECKPOINT
@@ -311,22 +369,7 @@ def fetch(years=None, raw_checkpoint=None, cache=None) -> pd.DataFrame:
               flush=True)
     ckpt.close()
 
-    df = pd.DataFrame(records)
-    mcols = [f"m{m:02d}" for m in range(1, 13)]
-    df["precip_annual"] = df[mcols].sum(axis=1)
-    df["precip_wet3"] = df[mcols].apply(
-        lambda r: max(r.values[i:i + 3].sum() for i in range(10)), axis=1)
-
-    # map GAUL names -> ISO3
-    x = _name_to_iso3()
-    norm = lambda s: "".join(ch for ch in s.lower() if ch.isalnum())
-    df["iso3"] = df["adm0_name"].map(
-        lambda n: GAUL_ISO3_OVERRIDES.get(n) or x.get(norm(n)))
-    miss = sorted(df.loc[df["iso3"].isna(), "adm0_name"].unique())
-    if miss:
-        print(f"\n[!] {len(miss)} GAUL names had no ISO3 match (fix manually if "
-              f"needed): {miss[:20]}{'...' if len(miss) > 20 else ''}", flush=True)
-    out = df.dropna(subset=["iso3"])[["iso3", "year", "precip_annual", "precip_wet3"]]
+    out = _finalize(records)
     out.to_csv(cache, index=False)
     print(f"\nSaved {out['iso3'].nunique()} countries / {len(out)} rows to {cache}",
           flush=True)
@@ -334,6 +377,13 @@ def fetch(years=None, raw_checkpoint=None, cache=None) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
+    if "--recompute" in sys.argv:
+        # Re-derive precip_annual/precip_wet3 from the existing raw checkpoint
+        # (e.g. after a change to the Python-side aggregation, like the Dec/Jan
+        # wrap fix) without hitting GEE again.
+        recompute()
+        sys.exit(0)
+
     # Optional light-parallelism split: `python fetch_precip_gee.py 2009 2015 a`
     # runs only years 2009-2015, checkpointing to precip_country_gee_raw_a.jsonl
     # (and precip_country_gee_a.csv) instead of the shared default files, so

@@ -35,7 +35,9 @@ instrumenting crop yield with ENSO-driven precipitation to isolate the crop →
 health channel — is a cleaner negative result: neither global ENSO nor
 country-level growing-season precipitation (fetched via Google Earth Engine,
 198 countries × 27 years) is a strong enough predictor of cereal yield to
-support credible 2SLS (first-stage F = 1.49 and 1.16 respectively, both far
+support credible 2SLS (first-stage F = 1.49, and F = 0.87 for precipitation
+after implementing both identified candidate fixes — a signed ONI series and
+a Dec/Jan-wrapping wet-season window — neither of which improved it, both far
 below the F > 10 rule of thumb). The Adhammika cascade is, in short, a
 *plausible but not yet robustly established* governance-conditioned pattern in
 the open-data record — not proof of the sutta's literal causal chain, and, on
@@ -163,8 +165,9 @@ the reason first suspected.** Two links in that chain were tested:
 > ENSO (unsigned |ONI| amplitude) → local growing-season precipitation:
 > coef = +0.031, **p = 0.46** — not significant.
 >
-> Local precipitation → cereal yield (the actual IV first stage): **F = 1.16**
-> — *weaker* than the global-ENSO instrument it was meant to replace.
+> Local precipitation → cereal yield (the actual IV first stage, original
+> non-wrapping wet-season window): **F = 1.16** — *weaker* than the
+> global-ENSO instrument it was meant to replace.
 
 One candidate cause from Limitations has since been tested and **confirmed**:
 unsigned ENSO amplitude averages together El Niño and La Niña, which push
@@ -181,23 +184,38 @@ unsigned amplitude gives a completely different answer:
 So the ENSO → precipitation link is not actually broken; the unsigned proxy
 was hiding it. **This does not, however, rescue the overall instrument**,
 because it isn't the binding constraint: the actual IV first stage is
-precipitation → cereal yield (F = 1.16), which this fix leaves untouched — it
-only strengthens the *diagnostic* that ENSO is a valid upstream driver of
-precipitation, not the *yield-relevance* of precipitation itself. The
-remaining bottleneck is the growing-season precipitation measure not
-capturing yield-relevant rainfall (see the unwrapped Dec/Jan window, still
-unfixed, below). The resulting 2SLS coefficient (+0.00018, p = 0.916) is
-directionally sane (more yield associates with more life expectancy) but,
-with the precip→yield F this low, is not statistically informative — weak
-instruments bias 2SLS toward the endogenous OLS estimate and inflate
-variance, so neither the sign nor the magnitude should be read as evidence
-for or against the causal channel. **We report this as a negative result**:
-with the open data used here, we could not construct an instrument for
-agricultural output strong enough to support credible 2SLS identification of
-the crop → health link, even after confirming and fixing one of the two
-suspected causes. One concrete, untested candidate fix (the Dec/Jan-wrapping
-wet-season window) remains, noted in Limitations below; the paper's central
-claim (H2/H3 reduced form, above) does not depend on this instrument.
+precipitation → cereal yield, which this fix leaves untouched — it only
+strengthens the *diagnostic* that ENSO is a valid upstream driver of
+precipitation, not the *yield-relevance* of precipitation itself.
+
+The second candidate cause was also implemented and tested: `precip_wet3`
+("wettest 3 consecutive months") originally never wrapped across the Dec/Jan
+boundary, so a wet season straddling the calendar year — common in Southern
+Hemisphere agriculture — could be understated. `src/fetch_precip_gee.py`
+(`_finalize`) now includes wrapping windows (Nov–Dec–next Jan,
+Dec–next Jan–next Feb) using each country's following year's data, recomputed
+from the already-fetched raw checkpoint (no new GEE calls needed). The fix is
+mechanically real and lands exactly where expected — Southern Hemisphere
+countries see the largest shifts (Namibia +28% average, up to +144% in single
+years; Zimbabwe +29% average; Australia and South Africa both double-digit
+average changes across ~half their years) — confirming the wrap was
+genuinely missing wet-season rainfall before. **It still doesn't fix the
+instrument.** The precipitation → cereal-yield first stage did not improve —
+if anything it weakened slightly, from F = 1.16 to **F = 0.87** — and the
+2SLS coefficient stayed statistically uninformative (+0.00012, p = 0.949).
+The signed-ONI relevance result holds up under the new precipitation data too
+(coef = −0.166, **p < 0.001**), so the ENSO→precipitation link remains solid;
+the weakness is specifically in whether country-year growing-season
+precipitation, however measured, predicts country-year cereal yield.
+
+**We report this as a negative result, now on firmer ground**: both
+identified candidate causes for the weak precip-IV first stage have been
+implemented and tested, and neither rescues it. With the open data used
+here — country-year cereal yield statistics and country-level growing-season
+precipitation, by any of the specifications tried — we could not construct an
+instrument for agricultural output strong enough to support credible 2SLS
+identification of the crop → health link. The paper's central claim (H2/H3
+reduced form, above) does not depend on this instrument.
 
 **Caveat on the instrument.** ENSO may reach health partly through floods and
 disease (cholera, malaria, disasters), not crops alone — so the exclusion
@@ -249,11 +267,14 @@ the reduced form — shocks hit crops harder, crops hit health harder, weak
 governance amplifies both legs — is asserted by the whole-chain result but not
 independently confirmed at the crop-yield step with country-level cereal
 statistics this coarse. And the causal version of H3, the actual point of the
-multi-day GEE precipitation build, is a clean negative result: neither ENSO →
-local precipitation (p = 0.46) nor local precipitation → cereal yield (F =
-1.16) is strong enough to support 2SLS. A weak instrument doesn't just fail to
+multi-day GEE precipitation build, is a clean negative result even after
+fixing both diagnosed weaknesses in the instrument: ENSO *does* predict local
+precipitation once signed correctly (p < 0.001), but precipitation still
+doesn't predict cereal yield (F = 0.87, down from 1.16 after also fixing the
+wet-season window — neither fix helped), so the instrument is not strong
+enough to support 2SLS regardless. A weak instrument doesn't just fail to
 help; it biases the 2SLS estimate toward the (endogenous) OLS number and
-inflates its variance, so the +0.00018 (p = 0.916) coefficient in §4 is not
+inflates its variance, so the +0.00012 (p = 0.949) coefficient in §4 is not
 evidence either way. The honest reading is that this dataset cannot currently
 identify the crop → health causal link, and — per the point above — cannot
 yet confidently establish the governance-conditioning of the reduced-form
@@ -274,35 +295,35 @@ effects alone.
 
 **Ecological inference and proxy limits.** Every number in this panel is a
 national annual average: capital-point or country-mean climate merged with
-country-mean crop yield merged with country-mean health. Three specific losses
-follow from that choice, each already flagged narrowly in Limitations: (1)
-agricultural regions are not capital cities, so climate exposure is mismeasured
-for any country where farmland and the capital have different weather; (2)
-ENSO amplitude is unsigned (|ONI|), which is the right regressor for "do bigger
-shocks hurt more" but the wrong one for a signed local-precipitation
-relevance test, since El Niño and La Niña push regional rainfall in opposite
-directions and averaging away that sign before the precip-IV stage is a
-plausible independent explanation for its weak first stage; (3) the
-growing-season window search doesn't wrap Dec/Jan, understating Southern
-Hemisphere wet seasons that straddle the calendar boundary. None of these is
-fatal to the reduced-form result, which only needs country-year climate
-severity, not a signed, regionally-precise precipitation series — but all
-three would need fixing before the IV chain could be revisited credibly.
+country-mean crop yield merged with country-mean health. That remains true
+even after fixing both diagnosed weaknesses in the precipitation instrument
+(unsigned ENSO, non-wrapping wet-season window — see §4; both tested, neither
+rescued the first stage), which narrows the honest explanation for the weak
+precip → cereal-yield link (F = 0.87) to what's left: (1) agricultural regions
+are not capital cities, so climate exposure is mismeasured for any country
+where farmland and the capital differ; and (2) country-year cereal-yield
+statistics are themselves coarse — a single national number averaging across
+regions, crops, and farming systems that ENSO-driven precipitation would
+plausibly affect quite differently. Neither is fatal to the reduced-form
+result, which only needs country-year climate severity, not a
+regionally-precise precipitation series predicting a regionally-precise yield
+series — but both would need fixing before the IV chain could be revisited
+credibly, and neither is a small fix.
 
-**What stronger identification would take.** For the precipitation IV chain:
-signed ONI (or a country-specific ENSO-teleconnection index rather than a
-global amplitude) to give the precipitation first stage a chance at
-cross-sectional power; a wrapped wet-season search; sub-national crop and
-climate data (FAO GAUL admin-1 yields against gridded precipitation) to escape
-country-year ecological aggregation entirely; and, if the goal is a genuinely
-causal crop → health estimate, an instrument with a stronger and
-better-understood a priori mechanism than ENSO-mediated rainfall. For the
-health interaction specifically: the robustness checks above (two-way FE,
-group-specific trends, outlier-year exclusion) should become the default
-specification, not an optional appendix — report the trend-controlled and
-outlier-robust estimate as the headline number, not the baseline one, and only
-upgrade the language back to "holds" if it survives. None of this is a quick
-fix; it is why these fixes are listed as open, not attempted.
+**What stronger identification would take.** The two cheap candidate fixes
+for the precipitation IV chain are exhausted (§4) — what's left is
+structural, not a parameter tweak: sub-national crop and climate data (FAO
+GAUL admin-1 yields against gridded precipitation) to escape country-year
+ecological aggregation entirely, since that is now the leading suspect for
+why precipitation, however measured, doesn't predict national cereal yield;
+or, if the goal is a genuinely causal crop → health estimate, an instrument
+with a stronger and better-understood a priori mechanism than ENSO-mediated
+rainfall altogether. For the health interaction specifically: the robustness
+checks above (two-way FE, group-specific trends, outlier-year exclusion)
+should become the default specification, not an optional appendix — report
+the trend-controlled and outlier-robust estimate as the headline number, not
+the baseline one, and only upgrade the language back to "holds" if it
+survives. None of this is a quick fix.
 
 **What this paper is and isn't.** It is not a demonstration that the Adhammika
 Sutta's causal chain is literally true, and the sutta's astronomical framing
@@ -349,14 +370,23 @@ result.
   significantly less growing-season precipitation. The hypothesis was
   correct, and the ENSO→precipitation link is real. It does not, however,
   rescue the IV chain: the binding constraint is the *next* link,
-  precipitation → cereal yield (F = 1.16), which this fix does not touch —
-  see the unwrapped wet-season window below, still the live candidate cause
-  of that specific weakness.
-- **The growing-season precipitation window doesn't wrap the calendar year
-  (still unfixed).** "Wettest 3 consecutive months" is computed only over
-  non-wrapping windows within Jan–Dec, so a true wet season straddling the
-  Dec/Jan boundary (common in Southern Hemisphere growing seasons) is
-  understated in exactly the years its peak crosses that boundary — a
-  plausible, still-untested contributor to the weak precip → yield first
-  stage (F = 1.16) that is now, after the signed-ONI fix above, the sole
-  remaining suspect for why the precipitation instrument doesn't work.
+  precipitation → cereal yield, which this fix does not touch.
+- **~~The growing-season precipitation window doesn't wrap the calendar
+  year~~ — tested and implemented; the first stage did not improve.**
+  "Wettest 3 consecutive months" originally used only non-wrapping windows
+  within Jan–Dec, understating a true wet season straddling the Dec/Jan
+  boundary (common in Southern Hemisphere growing seasons). `_finalize()` in
+  `src/fetch_precip_gee.py` now includes wrapping windows (Nov–Dec–next Jan,
+  Dec–next Jan–next Feb), recomputed from the existing raw checkpoint (no new
+  GEE calls). The fix is mechanically confirmed real — it lands squarely on
+  Southern Hemisphere countries (Namibia +28% average precip_wet3, up to
+  +144% in single years; Zimbabwe +29% average; Australia and South Africa
+  both double-digit average changes) — but the precipitation → cereal-yield
+  first stage did not improve; it went from **F = 1.16 to F = 0.87**, if
+  anything slightly weaker. Both identified candidate causes for the weak
+  precip-IV first stage are now tested and implemented, and neither rescues
+  it — the weakness is specifically in whether country-year growing-season
+  precipitation, however measured, predicts country-year cereal yield, not
+  in how ENSO or the precipitation proxy are constructed. A genuinely
+  different approach (sub-national yield/precipitation data; a different
+  instrument entirely) would be needed to take another run at this link.
