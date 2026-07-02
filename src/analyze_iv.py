@@ -127,6 +127,49 @@ def reduced_form_health(df: pd.DataFrame) -> None:
     say("")
 
 
+def robustness_health(df: pd.DataFrame) -> None:
+    """Does the ENSO x weak_gov effect on health (block 2) survive standard checks?
+    Added after /scrutinize found the baseline spec (EntityEffects only, no year FE,
+    no group-trend control) is the one spec in this file that omits controls every
+    other regression here uses -- and that omission turns out to matter."""
+    say("=" * 72)
+    say("2b) ROBUSTNESS: enso_amplitude:weak_gov on life_expectancy under stricter specs")
+    say("=" * 72)
+    d = df.dropna(subset=["life_expectancy", "enso_amplitude", "weak_gov", "log_gdp"]).copy()
+    d["year_c"] = d["year"] - d["year"].mean()
+    d = d.set_index(["iso3", "year"])
+
+    def _check(label: str, formula: str, data: pd.DataFrame) -> None:
+        res = PanelOLS.from_formula(formula, data, drop_absorbed=True).fit(
+            cov_type="clustered", cluster_entity=True)
+        b = res.params.get("enso_amplitude:weak_gov", np.nan)
+        p = res.pvalues.get("enso_amplitude:weak_gov", np.nan)
+        sig = "significant" if p < 0.05 else "NOT significant"
+        say(f"  [{label:<38}] interaction = {b:+.3f} ({sig}, p={p:.3f}, n={int(res.nobs)})")
+
+    base_f = "life_expectancy ~ 1 + enso_amplitude + enso_amplitude:weak_gov + log_gdp + EntityEffects"
+    _check("baseline (block 2 above)", base_f, d)
+    _check("+ TimeEffects (two-way FE)", base_f + " + TimeEffects", d)
+    _check("+ weak_gov x year trend",
+           "life_expectancy ~ 1 + enso_amplitude + enso_amplitude:weak_gov + log_gdp "
+           "+ weak_gov:year_c + EntityEffects", d)
+    _check("two-way FE + weak_gov x year trend",
+           "life_expectancy ~ 1 + enso_amplitude:weak_gov + log_gdp + weak_gov:year_c "
+           "+ EntityEffects + TimeEffects", d)
+    d_excl = d.reset_index()
+    d_excl = d_excl[~d_excl["year"].isin([1997, 1998, 2015, 2016])].set_index(["iso3", "year"])
+    _check("excl. super-El-Nino yrs (97/98,15/16)", base_f, d_excl)
+
+    say("  Reading: significant only in the baseline and the plain two-way-FE spec;")
+    say("  loses significance (and the group-trend spec flips sign) once weak-gov and")
+    say("  strong-gov countries are allowed separate secular health trends, and weakens")
+    say("  substantially once the two largest ENSO events are excluded. The headline")
+    say("  block-2 result should be read as fragile, not confirmed, until this is")
+    say("  resolved -- it does not currently clear the bar every other regression in")
+    say("  this file is held to (two-way FE).")
+    say("")
+
+
 def iv_2sls(df: pd.DataFrame) -> None:
     say("=" * 72)
     say("3) IV/2SLS: life_expectancy ~ [cereal_yield ~ enso_amplitude + enso_max_abs]")
@@ -188,6 +231,7 @@ def main() -> None:
     df = prepare(pd.read_csv(config.PANEL_CSV))
     reduced_form_yield(df)
     reduced_form_health(df)
+    robustness_health(df)
     iv_2sls(df)
     iv_precip(df)
     with open(REPORT, "w", encoding="utf-8") as f:
