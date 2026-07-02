@@ -1,6 +1,9 @@
 # Handoff — weater (Adhammika cascade → free-data climate-risk model)
 
-_Last updated: 2026-07-01. For a fresh agent continuing this work._
+_Last updated: 2026-07-02 (Discussion section added below). The GEE
+debugging narrative further down is a historical record frozen as of
+2026-07-01 — intentionally not rewritten; see SESSION_HANDOFF.md for current
+live status. For a fresh agent continuing this work._
 
 ## What this project is
 Tests the **Adhammika Sutta**'s causal cascade (governance → climate → crops →
@@ -27,6 +30,11 @@ Weak governance = bottom WGI quartile (Control of Corruption + Rule of Law; 52/2
 −0.42/yr vs weak-gov −0.86/yr), net of GDP + country FE. → climate shocks harm
 health ~2× more under weak governance. Honest caveats baked into the code
 (exclusion restriction, GDP confounding, FE washout).
+
+**Superseded by Discussion below**: this number turned out to be fragile
+under robustness checks added later (year FE, group-specific trends,
+outlier-year exclusion). Read Discussion, not this section alone, before
+citing the −0.44/p=0.033 figure.
 
 ## IN PROGRESS — pick up here
 Prior job `be7xnpebe` (started 2026-06-30) hung for 14+ hours and never produced
@@ -111,6 +119,54 @@ headers/warnings/completion. Rough pace from observed chunk timings:
 If this job also stalls/fails, `data/precip_country_gee_raw.jsonl` preserves
 whatever years already completed — just re-run `fetch_precip_gee.py` and it
 will skip years already in the checkpoint.
+
+**Status: the above is historical.** Job `bizzevp38` finished; the "When it
+finishes" steps 1–4 all happened; step 5 happened too, repeatedly, as the
+result changed. See Discussion immediately below for how this actually
+turned out — spoiler: the first-stage F did **not** jump into strong (>10)
+territory as hoped.
+
+## Discussion — how the causal chain (summit #2) actually turned out
+
+Matches `docs/whitepaper.md` §5 / `docs/research_design.md` §5 / `README.md`
+Discussion; this is the same conclusion, framed for someone picking up mid-debug.
+
+- **The reduced-form finding above (−0.44, p=0.033) is real but fragile, not
+  settled.** It holds — and tightens (p=0.015) — under year fixed effects, so
+  it isn't an artifact of omitting them. But it loses significance and flips
+  sign once weak-gov and strong-gov countries are allowed separate secular
+  health trends (p=0.101), and weakens hard once the two biggest ENSO events
+  (1997/98, 2015/16) are excluded (p=0.197). Added in `src/analyze_iv.py`
+  `robustness_health()`. Honest read: cannot yet rule out that the two
+  governance groups were just on different health trajectories that happen
+  to line up with the ENSO cycle over this particular 27-year window.
+- **The GEE precip fetch above succeeded completely (198 countries, 27
+  years) but didn't rescue the IV as hoped.** First-stage F sequence: global
+  ENSO 1.49 → local precipitation 1.16 → local precipitation after fixing
+  BOTH identified weaknesses 0.87. All far below the F>10 threshold this
+  whole debugging saga was fought to reach.
+  - *Weakness 1, ENSO amplitude unsigned:* fixed (`enso_signed_mean` in
+    `src/fetch_astro_temporal.py`). Confirmed the diagnosis — signed ONI
+    predicts local precip strongly (p<0.001) where unsigned didn't (p=0.46)
+    — but this only fixes the ENSO→precip *diagnostic* link, not the actual
+    bottleneck.
+  - *Weakness 2, wet-season window doesn't wrap Dec/Jan:* fixed
+    (`_finalize()` in `src/fetch_precip_gee.py`, recomputed from the
+    existing raw checkpoint with `--recompute`, no new GEE calls). Confirmed
+    mechanically real — hits Southern Hemisphere countries hardest (Namibia
+    +28% avg, Zimbabwe +29% avg) — but the actual first stage went from
+    F=1.16 to **F=0.87**, slightly worse, not better.
+  - Conclusion: the multi-day fight to get GEE precipitation working (this
+    whole file) was necessary to even test the hypothesis, but the
+    hypothesis itself — that country-level precipitation would give the IV
+    cross-sectional power — didn't pan out. The bottleneck was never really
+    "can we get precipitation data," it was "does precipitation predict
+    national cereal yield," and the answer, after all that, is no.
+- **Bottom line:** the paper's honest finding is a real, governance-
+  conditioned but fragile reduced-form pattern, plus a fully-tested causal
+  negative result. Neither is the outcome summit #2 was aiming for when this
+  debugging saga started, and that's reported plainly rather than smoothed
+  over — see `docs/whitepaper.md` for the full writeup.
 
 ## Known issues / decisions
 - Open-Meteo capital-point fetchers (`fetch_climate_country.py` /
