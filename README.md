@@ -36,7 +36,7 @@ python src/plot.py            # figures -> outputs/*.png
 Re-fetch from source with `--force`. Data is cached under `data/` so reruns are
 offline.
 
-## Precision precipitation via Google Earth Engine (the IV first-stage fix)
+## Precision precipitation via Google Earth Engine (the attempted IV first-stage fix)
 
 The causal IV needs country-level, ENSO-driven growing-season precipitation.
 Capital-point Open-Meteo works but is rate-limited; CHIRPS via GEE is the
@@ -51,18 +51,34 @@ earthengine authenticate
 #    PowerShell:  $env:GEE_PROJECT="your-project-id"
 python src/fetch_precip_gee.py              # -> data/precip_country_gee.csv
 python src/build_panel.py                   # panel auto-merges precipitation
-python src/analyze_iv.py                    # re-runs the IV with the strong first stage
+python src/analyze_iv.py                    # re-runs the IV -- first stage stays weak, see Discussion
 ```
 
 `build_panel.py` automatically prefers `precip_country_gee.csv` (GEE) over the
 Open-Meteo proxy when present, and adds `precip_anom` (growing-season anomaly).
+Spoiler: this doesn't end up fixing the instrument either — see below.
 
-## Honest finding
+## Discussion
 
 The substitution works — proxies recover known reality (ENSO reproduces the
-1997/98 and 2015/16 El Niños; governance correlates with longevity). But the
-*causal* claims largely dissolve under controls: governance loses significance
-once GDP is held constant, and the ENSO×governance buffering effect points the
-predicted direction but is **not** statistically significant. The cascade is a
-real pattern of co-movement driven by development, not a proven causal chain —
-and definitely not literal celestial mechanics. Details in the research design.
+1997/98 and 2015/16 El Niños; governance correlates with health as expected).
+The core reduced-form claim — ENSO shocks depress life expectancy roughly
+twice as much in weak-governance countries (interaction p = 0.033) — holds
+under country fixed effects and a GDP control, and even tightens under year
+fixed effects (p = 0.015). But it's **fragile, not settled**: it loses
+significance and flips sign once the two governance groups are allowed
+separate secular health trends, and weakens hard once the two biggest El
+Niño years are excluded from the sample.
+
+The *causal* (instrumented) version of the claim is a clean negative result,
+and a thoroughly-tested one: neither the naive global-ENSO instrument
+(first-stage F = 1.49) nor country-level growing-season precipitation
+(F = 1.16, or F = 0.87 after fixing both identified weaknesses in the
+precipitation proxy — an unsigned ENSO relevance regressor and a
+non-wrapping wet-season window) is strong enough to identify the crop →
+health link. Both fixes were implemented and verified mechanically correct;
+neither rescued the instrument. The cascade is a real, governance-conditioned
+pattern in the open-data record — not a proven causal chain, and definitely
+not literal celestial mechanics. Full accounting in
+[`docs/whitepaper.md`](docs/whitepaper.md) §4–5 and
+[`docs/research_design.md`](docs/research_design.md) §5.
